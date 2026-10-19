@@ -421,18 +421,30 @@ Every hook fails closed on unparsable input. Restart Claude Code after installin
 
 ## 🧭 The Build OS: idea → shipped product
 
-For new products, the CLI is the enforcement layer and `BUILD-OS.md` is the process.
+For new products, and for existing apps you want to finish, the CLI is the enforcement layer
+and `BUILD-OS.md` is the process. It's built for a solo founder on a near-zero budget.
+
+With the plugin, say *"start docs/SRS.pdf"* (or just *"build an app from my SRS"*). If you don't
+give a path, `/realitygate:build` asks where your SRS is, then sets everything up step by step.
+Without the plugin:
 
 ```bash
 mkdir my-app && cd my-app && git init
-npx github:usmanmanii/realitygate init        # BUILD-OS.md, START-HERE.md, docs/IDEA.md, config
+npx github:usmanmanii/realitygate init --srs ../SRS.pdf   # kit, 6 subagents, config, your SRS in docs/input/
 npx github:usmanmanii/realitygate doctor
 ```
 
-1. Fill in `docs/IDEA.md` (13 short sections; "unsure" is a valid answer).
-2. Drop any documents (SRS, PDFs, notes, screenshots) into `docs/input/`.
+1. Your SRS is the primary input. No SRS? Fill in `docs/IDEA.md` instead (13 short sections;
+   "unsure" is a valid answer).
+2. Drop any other documents (research, PDFs, notes, screenshots) into `docs/input/`.
 3. Open Claude Code and paste the kickoff prompt from [START-HERE.md](START-HERE.md).
 4. After that, you mostly type `continue`.
+
+`init` installs six subagents in `.claude/agents/`: `planner`, `spec-critic`, `verifier`,
+`security-auditor`, `drift-auditor` and `researcher`. Phase 0 writes `docs/COSTS.md`, a
+monthly cost estimate with free-tier limits and a cost ceiling, and `ship` writes
+`docs/RELEASE-READINESS.md`, which ends in exactly one state: `CODE COMPLETE`, `RELEASE READY`
+or `LIVE DEPLOYED`.
 
 ```
  PHASE 0  Ingest · Probe · Profile · Scaffold   reads every doc, flags contradictions, checks your
@@ -447,8 +459,9 @@ npx github:usmanmanii/realitygate doctor
  PHASE 7  Post-launch                           errors → funnel → feedback → triggers → replan
 ```
 
-**Your vocabulary:** `continue` · `status` · `verify` · `next` · `blocked` · `replan` ·
-`checkpoint` · `ship` · `explain` · `approve A-007` · `reject A-007 <why>`
+**Your vocabulary** (plain words, no slash): `start <SRS>` · `continue` / `resume` · `status` ·
+`verify` · `next` · `blocked` · `replan` · `checkpoint` · `ship` / `prepare release` ·
+`plan next release` · `explain` · `approve A-007` · `reject A-007 <why>`
 
 **What only you decide:** you approve the spec; you approve schema, auth, money, data
 deletion, dependencies and deploys, through plain-language approval cards with a
