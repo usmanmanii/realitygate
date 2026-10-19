@@ -5,6 +5,9 @@
 ### Added
 - GitHub Flow contribution and release guidance, PR and issue templates, importable protection rulesets, and stable required CI checks.
 
+### Security
+- CI workflow runs with a read-only `contents: read` token.
+
 ## 0.1.0 — 2026-10-19
 
 First release.
