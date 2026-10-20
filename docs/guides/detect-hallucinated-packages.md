@@ -74,7 +74,7 @@ dependencies before you install them, as described below.
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: usmanmanii/realitygate@v0.2.1
+- uses: usmanmanii/realitygate@v0.3.0
 ```
 
 Or anywhere with Node 20+: `npx realitygate check`.

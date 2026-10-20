@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-21
+
+**Upgrading:** gates can go red on upgrade. New error rules: R-017 (env var missing from `.env.example`), R-019 (tests that can't fail, including a committed `.only`) and R-021 (declared dependency missing from the lockfile; a stale lockfile fails). R-015 now flags routes that only decode input. Fix the code, or add a `justified: <reason>` comment where the rule allows it; an `exclude` or `disable` entry needs a reason and is listed under Not scanned. New warnings (R-018, R-020, per-test R-019) don't fail the gate. Scores can drop.
+
 ### Added
 - `init --srs <file>` copies your SRS or requirements document into `docs/input/` (never overwrites it, refuses `.env*` files), and `doctor` reports whether any requirements input exists yet.
 - `init` installs the six Build OS subagents (`planner`, `spec-critic`, `verifier`, `security-auditor`, `drift-auditor`, `researcher`) into `.claude/agents/`, from tested templates instead of having Phase 0 write them.
