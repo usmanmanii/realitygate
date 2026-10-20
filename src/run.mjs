@@ -215,7 +215,12 @@ export async function runBoot(root, run) {
     steps.push({ command: start, exitCode: result.exitCode });
     return { ...base, command: start, exitCode: result.exitCode, durationMs: result.durationMs, steps, envPassed: passed, status: result.ok ? "PASS" : "FAIL", detail: result.detail };
   } finally {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    } catch (e) {
+      // A temp copy left behind is the OS's to clean up; it says nothing about whether the app booted.
+      process.emitWarning(`could not remove the boot copy ${dir}: ${e.code ?? e.message}`);
+    }
   }
 }
 
@@ -235,8 +240,15 @@ function startAndWait(command, { cwd, env, ready, probe, timeoutS }) {
       done = true;
       timers.forEach(clearTimeout);
       timers.forEach(clearInterval);
+      const result = { ok, detail, exitCode, durationMs: Date.now() - started };
+      if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return resolvePromise(result);
+      // Windows holds the copy's files until the killed process is gone; wait for it (at most 5 s) so cleanup can delete them.
+      const settle = setTimeout(() => resolvePromise(result), 5000);
+      child.once("close", () => {
+        clearTimeout(settle);
+        resolvePromise(result);
+      });
       killTree(child);
-      resolvePromise({ ok, detail, exitCode, durationMs: Date.now() - started });
     };
     const tryProbe = async () => {
       if (probing || done) return;
