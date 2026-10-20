@@ -7,7 +7,7 @@ import { buildGoResolver, buildPythonResolver } from "./langs.mjs";
 import { LOCKFILE, MANIFEST, buildLockIndex } from "./lockfile.mjs";
 import { FILE_RULES, LINE_RULES, MANIFEST_RULE_IDS, TEST_RULE_IDS } from "./rules.mjs";
 import { isRealTestFile } from "./testquality.mjs";
-import { buildUsageIndex } from "./unwired.mjs";
+import { buildUsageIndex, unwiredSkips } from "./unwired.mjs";
 
 const MAX_LINE = 2000;
 // The Go convention, also used by protoc, sqlc and others: a generated file says so at the top.
@@ -86,7 +86,28 @@ export function exclusions(root, config, allFiles) {
   }
   items.push({ what: "test files", reason: "read only by R-019/R-020; fixtures, mocks and snapshots not at all", files: code.filter(isTestFile).length });
   for (const id of config.disable) items.push({ what: `rule ${id} disabled`, reason: config.disableReasons?.[id] ?? "no reason given", files: null, configured: true });
-  items.push({ what: "R-018 skips", reason: "framework entry files, bin/, scripts/, index/main/server files, components/ui/ and convention exports; see the README", files: null });
+  // With no manifest there is nothing to check imports against, so R-014 is off for that language.
+  if (!config.disable.includes("R-014")) {
+    const scanned = config.include.length ? app.filter(compileGlobs(config.include)) : app;
+    for (const [lang, ext, manifest, names] of [
+      ["JS/TS", /\.[cm]?[jt]sx?$/, /(?:^|\/)package\.json$/, "package.json"],
+      ["Python", /\.py$/, /(?:^|\/)(?:requirements[\w.-]*\.(?:txt|in)|requirements\/[\w.-]+\.(?:txt|in)|pyproject\.toml|Pipfile|setup\.py|setup\.cfg)$/, "requirements*.txt, pyproject.toml, Pipfile or setup.py"],
+      ["Go", /\.go$/, /(?:^|\/)go\.(?:mod|work)$/, "go.mod"],
+    ]) {
+      const files = scanned.filter((f) => ext.test(f)).length;
+      if (files && !allFiles.some((f) => manifest.test(f))) items.push({ what: `R-014 off for ${lang}`, reason: `no ${names} to check imports against`, files });
+    }
+  }
+  if (!config.disable.includes("R-018")) {
+    const scanned = config.include.length ? app.filter(compileGlobs(config.include)) : app;
+    const s = unwiredSkips(root, allFiles, scanned);
+    if (s.wildcard) items.push({ what: "R-018 off", reason: 'a package.json exports "./*", so any file is public and no export can be called unused', files: s.checked });
+    else {
+      if (s.entry) items.push({ what: "R-018 skips entry files", reason: "framework entry files, bin/, scripts/, hooks/, index/main/server/app files, stories and components/ui/ are loaded by location; see the README", files: s.entry });
+      if (s.named) items.push({ what: "R-018 skips files named by config", reason: "package.json, HTML, YAML or a tool config names them by path", files: s.named });
+      items.push({ what: "R-018 skips convention exports", reason: "names frameworks read by convention (GET, metadata, loader…), default exports and type exports; see the README", files: null });
+    }
+  }
   return items;
 }
 

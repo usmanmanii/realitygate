@@ -4,7 +4,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
 import { runAudit } from "../src/audit.mjs";
-import { auditAtRef, auditDelta, changedFiles } from "../src/compare.mjs";
+import { auditAtRef, auditDelta, changedFiles, deletedFiles } from "../src/compare.mjs";
 import { runCheck } from "../src/check.mjs";
 import { prCommentMarkdown, PR_COMMENT_MARKER } from "../src/report.mjs";
 import { cli, hasGit, makeProject } from "./helpers.mjs";
@@ -129,6 +129,33 @@ describe("change mode: check --changed", { skip: !hasGit() }, () => {
     const r = runCheck(dir, { onlyFiles: changedFiles(dir) });
     assert.deepEqual(r.errors.map((e) => `${e.rule} ${e.file}`), ["R-017 src/orders.ts"]);
     assert.deepEqual(r.widened.map((w) => w.rules), [["R-017"]]);
+  });
+
+  test("deleting the manifest or the env example warns that the check is now off, instead of passing quietly", () => {
+    const dir = repo();
+    writeFileSync(join(dir, ".env.example"), "API_KEY=example\n");
+    writeFileSync(join(dir, "src/orders.ts"), "export const total = (xs: number[]) => xs.length + (process.env.API_KEY ? 0 : 0);\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-q", "-m", "env");
+    git(dir, "rm", "-q", ".env.example", "package.json");
+
+    assert.deepEqual([...deletedFiles(dir)].sort(), [".env.example", "package.json"]);
+    const r = runCheck(dir, { onlyFiles: changedFiles(dir), deleted: deletedFiles(dir) });
+    assert.equal(r.ok, true, "a deletion alone is not a violation");
+    assert.deepEqual(r.warnings.map((w) => `${w.rule} ${w.file}`), ["R-017 .env.example", "R-014 package.json"]);
+    assert.match(r.warnings[0].text, /2 source file\(s\) under the root now have no env example/);
+    assert.deepEqual(r.widened[0].because, [".env.example", "package.json"]);
+    const out = cli(["check", dir, "--changed"]);
+    assert.match(out.stdout, /check switched off: its source file was deleted/);
+  });
+
+  test("a renamed env example counts as deleted under its old name", () => {
+    const dir = repo();
+    writeFileSync(join(dir, ".env.example"), "API_KEY=example\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-q", "-m", "env");
+    git(dir, "mv", ".env.example", "env.txt");
+    assert.deepEqual([...deletedFiles(dir)], [".env.example"]);
   });
 
   test("a change that touches no manifest scans only the changed files", () => {

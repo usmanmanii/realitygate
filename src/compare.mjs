@@ -100,19 +100,39 @@ export function auditDelta(base, head, ref) {
  * base, staged, unstaged and untracked. Paths are relative to `root`.
  */
 export function changedFiles(root, base = "HEAD") {
+  return diffFiles(root, base, "ACMR", true);
+}
+
+/** Files deleted (or renamed away) relative to `base`, the same way. A deleted manifest turns rules off silently. */
+export function deletedFiles(root, base = "HEAD") {
   const top = repoTop(root);
+  const from = mergeBase(top, base);
+  const renamed = git(top, ["diff", "--name-status", "-z", "--diff-filter=R", from]).split("\0");
+  // -z --name-status gives "R100\0old\0new\0" per rename; the old path is gone.
+  const renamedAway = [];
+  for (let i = 0; i + 2 < renamed.length; i += 3) if (renamed[i].startsWith("R")) renamedAway.push(renamed[i + 1]);
+  return new Set([...diffFiles(root, base, "D", false), ...strip(root, renamedAway)]);
+}
+
+function mergeBase(top, base) {
   const sha = verifyRef(top, base);
-  let from = sha;
   try {
-    from = git(top, ["merge-base", sha, "HEAD"]).trim() || sha;
+    return git(top, ["merge-base", sha, "HEAD"]).trim() || sha;
   } catch {
-    from = sha;
+    return sha;
   }
-  const tracked = git(top, ["diff", "--name-only", "-z", "--diff-filter=ACMR", from]).split("\0");
-  const untracked = git(top, ["ls-files", "-z", "--others", "--exclude-standard"]).split("\0");
+}
+
+function strip(root, paths) {
   const sub = repoPrefix(root);
   const prefix = sub ? `${sub}/` : "";
-  return new Set(
-    [...tracked, ...untracked].filter((f) => f && f.startsWith(prefix)).map((f) => f.slice(prefix.length)),
-  );
+  return paths.filter((f) => f && f.startsWith(prefix)).map((f) => f.slice(prefix.length));
+}
+
+function diffFiles(root, base, filter, withUntracked) {
+  const top = repoTop(root);
+  const from = mergeBase(top, base);
+  const tracked = git(top, ["diff", "--name-only", "-z", `--diff-filter=${filter}`, from]).split("\0");
+  const untracked = withUntracked ? git(top, ["ls-files", "-z", "--others", "--exclude-standard"]).split("\0") : [];
+  return new Set(strip(root, [...tracked, ...untracked]));
 }

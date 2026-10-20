@@ -39,6 +39,48 @@ describe("R-019 tests that can't fail", () => {
     assert.deepEqual(fakeTests("src/app.test.tsx", smoke.replace('test("renders", () => {', 'test("renders", () => { // justified: smoke test, render throws on error')), []);
   });
 
+  test("one asserting test no longer hides a sibling with no assertion (a warning, per test)", () => {
+    const f = VITEST + 'import { add } from "../src/add";\ntest("adds", () => {\n  expect(add(1, 2)).toBe(3);\n});\ntest("adds again", () => {\n  const r = add(2, 2);\n});\nit("async() with no space", async() => {\n  const r = add(1, 1);\n  setTimeout(() => {\n    console.log(r);\n  });\n});\n';
+    const hits = fakeTests("src/add.test.ts", f);
+    assert.deepEqual(hits.map((h) => [h.line, h.severity]), [[6, "warn"], [9, "warn"]]);
+    assert.match(hits[0].text, /no assertion \(other tests in the file do\)/);
+    const py = "from app.calc import add\n\ndef test_adds():\n    assert add(1, 2) == 3\n\ndef test_adds_again():\n    add(2, 2)\n";
+    assert.deepEqual(fakeTests("tests/test_calc.py", py).map((h) => h.line), [6]);
+    const go = "package calc\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(1, 2) != 3 {\n\t\tt.Fatal(\"bad\")\n\t}\n}\n\nfunc TestAddAgain(t *testing.T) {\n\tAdd(2, 2)\n}\n";
+    assert.deepEqual(fakeTests("calc/calc_test.go", go).map((h) => h.line), [11]);
+  });
+
+  test("reading one file doesn't change what is found in the next (shared regex state)", () => {
+    const noAssert = "def test_a():\n    run()\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+    const nested = "def test_outer():\n    class T:\n        def test_inner(self):\n            return True\n    assert T().test_inner()\n\ndef test_other():\n    assert 1 + 1 == 2\n";
+    const before = fakeTests("tests/test_n.py", nested);
+    fakeTests("tests/test_a.py", noAssert);
+    assert.deepEqual(fakeTests("tests/test_n.py", nested), before);
+    assert.deepEqual(before, []);
+  });
+
+  test("per test: helpers, throws, awaits, the test's own parameters and e2e suites count as a way to fail", () => {
+    const sibling = 'test("real", () => {\n  expect(f()).toBe(1);\n});\n';
+    for (const body of [
+      "  checkOrder(order);", // named like an assertion helper
+      "  run(order);\n}\nfunction run(o) {\n  expect(o).toBeTruthy();", // a helper defined in the file
+      "  SortTester.testSort(sort);", // a local test-support module
+      '  if (f() !== 1) throw new Error("bad");',
+      "  await client.orders.create(order);", // awaited work rejects
+      '  server.get("/", done);', // the test's own parameter
+      "  eq(f(), 1);", // an assertion imported under another name
+    ]) {
+      const head = 'import { strictEqual as eq } from "node:assert";\nimport { SortTester } from "../SortTester";\n';
+      const fn = body.includes("done") ? "(done) =>" : "async () =>";
+      const f = `${VITEST}${head}${sibling}test("other", ${fn} {\n${body}\n});\n`;
+      assert.deepEqual(fakeTests("src/a.test.ts", f), [], body);
+    }
+    const noAssert = `${VITEST}${sibling}test("other", () => {\n  page.goto("/");\n  listing.itemExist("x");\n});\n`;
+    assert.deepEqual(fakeTests("cypress/e2e/list.spec.ts", noAssert.replace("  page.goto(\"/\");\n", "")), []);
+    const py = "def test_a():\n    assert f() == 1\n\ndef test_b(client):\n    client.get('/')\n\ndef test_c(self):\n    self.check_order()\n\nasync def test_d():\n    class T:\n        def test1(self):\n            return True\n    assert T().test1()\n";
+    assert.deepEqual(fakeTests("tests/test_x.py", py), []);
+  });
+
   test("Python: pass/.../docstring-only bodies and literal asserts are flagged", () => {
     const f = 'def test_a():\n    pass\n\n\ndef test_b() -> None:\n    """Later."""\n\n\nclass TestC:\n    def test_c(self):\n        ...\n\n    def test_d(self):\n        assert True\n\n    def test_e(self):\n        self.assertEqual(1, 1)\n\n\ndef test_real():\n    assert add(1, 1) == 2\n';
     assert.deepEqual(lines(fakeTests("tests/test_x.py", f)), [1, 5, 10, 14, 17]);

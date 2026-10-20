@@ -67,11 +67,33 @@ export function buildUsageIndex(root, allFiles) {
     disabled: wildcardExports,
     usedElsewhere: (name, ownContent) => (appFiles.get(name) ?? 0) - (new RegExp(`(?<![\\w$])${escape(name)}(?![\\w$])`).test(ownContent) ? 1 : 0) > 0,
     usedInTests: (name) => inTests.has(name),
-    namedByConfig: (file) => {
-      const noExt = file.replace(/\.[^./]+$/, "");
-      return configText.includes(file) || configText.includes(`${noExt}"`) || configText.includes(`${noExt}'`);
-    },
+    namedByConfig: (file) => namedIn(configText, file),
   };
+}
+
+/**
+ * How many of `files` R-018 skips whole, and why: framework entry files by
+ * location, and files that package.json, HTML, YAML or a tool config names by
+ * path. Reads only those config files, not the whole project.
+ */
+export function unwiredSkips(root, allFiles, files) {
+  let configText = "";
+  let wildcard = false;
+  for (const f of allFiles) {
+    if (isTestFile(f) || !CONFIG_EXT.test(f)) continue;
+    const text = readText(root, f) ?? "";
+    configText += `\n${text}`;
+    if (/(?:^|\/)package\.json$/.test(f) && /"\.\/[^"]*\*[^"]*"\s*:/.test(text)) wildcard = true;
+  }
+  const js = files.filter((f) => /\.[cm]?[jt]sx?$/.test(f));
+  const entry = js.filter((f) => ENTRY_FILE.test(f));
+  const named = js.filter((f) => !ENTRY_FILE.test(f) && namedIn(configText, f));
+  return { checked: js.length, entry: entry.length, named: named.length, wildcard };
+}
+
+function namedIn(configText, file) {
+  const noExt = file.replace(/\.[^./]+$/, "");
+  return configText.includes(file) || configText.includes(`${noExt}"`) || configText.includes(`${noExt}'`);
 }
 
 /** Named exports in `file` that nothing else in the project mentions. */

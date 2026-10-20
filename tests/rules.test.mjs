@@ -98,6 +98,35 @@ describe("file rules", () => {
       assert.ok(!rulesIn(f).includes("R-015"), body);
     }
   });
+  test("R-015: a decoder under another name is still not validation", () => {
+    for (const [setup, call] of [
+      ["const p = JSON;", "p.parse(await req.text())"],
+      ["const a = JSON;\nconst b = a;", "b.parse(await req.text())"],
+      ['import * as y from "yaml";', "y.parse(await req.text())"],
+      ['import jsYaml from "js-yaml";', "jsYaml.load(await req.text())"],
+      ['const q = require("qs");', "q.parse(await req.text())"],
+    ]) {
+      const f = scan({ "app/api/orders/route.ts": `${setup}\nexport async function POST(req: Request) {\n  const body = ${call};\n  return Response.json(body);\n}\n` });
+      assert.ok(rulesIn(f).includes("R-015"), setup);
+    }
+  });
+  test("R-015: a schema held under another name still counts", () => {
+    for (const [setup, call] of [
+      ["const S = Order;", "S.parse(await req.json())"],
+      ['import Order from "./schemas/order";', "Order.parse(await req.json())"],
+      ['import * as schemas from "./schemas";', "schemas.order.parse(await req.json())"],
+    ]) {
+      const f = scan({ "app/api/orders/route.ts": `${setup}\nexport async function POST(req: Request) {\n  const body = ${call};\n  return Response.json(body);\n}\n` });
+      assert.ok(!rulesIn(f).includes("R-015"), setup);
+    }
+  });
+  test("R-015 (Python): json under another name is not validation; a marshmallow schema is", () => {
+    const route = (setup, call) => `${setup}\nfrom flask import Flask, request\napp = Flask(__name__)\n\n@app.post("/orders")\ndef create():\n    data = ${call}\n    return data\n`;
+    for (const [setup, call] of [["import json as j", "j.load(request.data)"], ["import json\nloader = json", "loader.load(request.data)"]]) {
+      assert.ok(rulesIn(scan({ "app/routes.py": route(setup, call) })).includes("R-015"), setup);
+    }
+    assert.ok(!rulesIn(scan({ "app/routes.py": route("from app.schemas import OrderSchema\nschema = OrderSchema()", "schema.load(request.json)") })).includes("R-015"));
+  });
   test("R-015 treats a verified webhook signature as validation", () => {
     const f = scan({
       "app/api/webhooks/stripe/route.ts":

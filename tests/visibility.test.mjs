@@ -39,6 +39,26 @@ describe("exclusions are shown with their reasons", () => {
     assert.throws(() => loadConfig(project({ "realitygate.config.json": { disable: [{ reason: "x" }] } })), ConfigError);
   });
 
+  test("R-018's skips are counted per file: entry files and files named by config", () => {
+    const dir = project({
+      "package.json": { name: "x", main: "src/lib/entry.js" },
+      "src/index.ts": "export const app = 1;\n",
+      "app/page.tsx": "export default function Page() {\n  return null;\n}\n",
+      "src/lib/entry.js": "export const run = 1;\n",
+      "src/lib/util.ts": "export const u = 1;\n",
+    });
+    const byWhat = Object.fromEntries(runCheck(dir).excluded.map((e) => [e.what, e.files]));
+    assert.equal(byWhat["R-018 skips entry files"], 2);
+    assert.equal(byWhat["R-018 skips files named by config"], 1);
+    assert.ok("R-018 skips convention exports" in byWhat);
+    const noManifest = runCheck(project({ "src/a.ts": 'import x from "left-pad";\nexport const a = x;\n', "svc/b.py": "import requests\n" }));
+    const off = Object.fromEntries(noManifest.excluded.filter((e) => e.what.startsWith("R-014")).map((e) => [e.what, [e.files, e.reason]]));
+    assert.deepEqual(off, { "R-014 off for JS/TS": [1, "no package.json to check imports against"], "R-014 off for Python": [1, "no requirements*.txt, pyproject.toml, Pipfile or setup.py to check imports against"] });
+    assert.ok(!byWhat["R-014 off for JS/TS"], "a project with package.json has R-014 on");
+    const wildcard = runCheck(project({ "package.json": { name: "x", exports: { "./*": "./src/*.js" } }, "src/a.js": "export const a = 1;\n" }));
+    assert.deepEqual(wildcard.excluded.filter((e) => e.what.startsWith("R-018")).map((e) => [e.what, e.files]), [["R-018 off", 1]]);
+  });
+
   test("check lists every exclusion, its reason and file count, including a glob that matches nothing", () => {
     const r = runCheck(project(APP));
     const byWhat = Object.fromEntries(r.excluded.map((e) => [e.what, e]));

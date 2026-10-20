@@ -19,9 +19,13 @@
 - `realitygate mcp`: read-only MCP server on stdio (`audit`, `check`, `proof`, `scan_skills`, `list_rules`), serving MCP 2026-07-28 requests and the older `initialize` handshake.
 - Go support (`.go` sources, `_test.go`, R-013 `if err != nil {}` / `_ = err`, R-014 against `go.mod`) and deeper Python: R-014 against `requirements*.txt`, `pyproject.toml`, `Pipfile`, `setup.py`/`setup.cfg`; R-006 `# type: ignore`; R-007 `# noqa` / `# pylint: disable`; R-015 for Flask, FastAPI and Django handlers. Files whose header says `Code generated … DO NOT EDIT`, and `*.pb.go` / `*_pb2.py`, are skipped.
 - Guides: use RealityGate with Spec Kit, OpenSpec and Superpowers.
+- R-019 also judges each test on its own: a test with no assertion in a file whose other tests assert is a warning. Assertion-like helper names, functions defined in the file, test-support imports, `throw`, `await`, the test's own parameters and `cypress/`/`e2e/`/`playwright/` folders all count as a way to fail.
+- Change mode warns when a change deletes (or renames away) a dependency manifest or env example, naming the check that it switched off, instead of going quietly green.
+- The **Not scanned** list counts R-018's skips per file (entry files, files named by config, or "R-018 off" for a `"./*"` export) and says when R-014 is off because a language has no manifest.
 
 ### Fixed
-- R-015 counted any `.parse(` or `.load(` call as validation, so `JSON.parse(await req.text())` or `json.load(request.files[...])` made an unvalidated route pass. Decoders such as `JSON`, `qs`, `yaml`, `pickle` and `json` no longer count; a schema's `.parse`/`.validate`/`.load` still does. Routes that only decoded input may now get R-015.
+- R-015 counted any `.parse(` or `.load(` call as validation, so `JSON.parse(await req.text())` or `json.load(request.files[...])` made an unvalidated route pass. Decoders such as `JSON`, `qs`, `yaml`, `pickle` and `json` no longer count; a schema's `.parse`/`.validate`/`.load` still does. Routes that only decoded input may now get R-015. A decoder under another name (`const p = JSON`, `import * as y from "yaml"`, `const q = require("qs")`, `import json as j`) doesn't count either.
+- R-019 could skip the first tests of a Python or Go test file read right after a file with no assertion, because a shared regex kept its position between files.
 - The portable `realitygate-build` skill (Codex, Antigravity and other Agent Skills tools) was missing the "fill in IDEA.md" and "execute Phase 0" steps: they were dropped together with the plugin-only fallback line. A test now guards every skill against this.
 
 ### Changed

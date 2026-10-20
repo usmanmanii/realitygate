@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { installAgents, installGitHook } from "../src/agents.mjs";
 import { runAudit } from "../src/audit.mjs";
-import { auditAtRef, auditDelta, changedFiles } from "../src/compare.mjs";
+import { auditAtRef, auditDelta, changedFiles, deletedFiles } from "../src/compare.mjs";
 import { auditMarkdown, bootLine, printAudit, prCommentMarkdown } from "../src/report.mjs";
 import { printCheck, runCheck } from "../src/check.mjs";
 import { ConfigError, loadConfig } from "../src/config.mjs";
@@ -184,7 +184,8 @@ async function main() {
       const dir = resolve(rest[0] ?? ".");
       const base = typeof flags.changed === "string" ? flags.changed : typeof flags.base === "string" ? flags.base : "HEAD";
       const onlyFiles = flags.changed ? changedFiles(dir, base) : undefined;
-      const result = runCheck(dir, { configPath: typeof flags.config === "string" ? flags.config : undefined, onlyFiles });
+      const deleted = flags.changed ? deletedFiles(dir, base) : undefined;
+      const result = runCheck(dir, { configPath: typeof flags.config === "string" ? flags.config : undefined, onlyFiles, deleted });
       if (onlyFiles) result.base = base;
       if (flags.json) out(JSON.stringify(result, null, 2));
       else printCheck(result);

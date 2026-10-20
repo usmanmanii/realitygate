@@ -41,6 +41,18 @@ const CANARIES = {
   "R-019": { path: "src/canary-r019.test.ts", content: 'import { expect, test } from "vitest";\n\ntest("adds", () => {\n  expect(true).toBe(true);\n});\n' },
   "R-020": { path: "src/canary-r020.test.ts", content: 'import { expect, test } from "vitest";\n\ntest.skip("adds", () => {\n  expect(1 + 1).toBe(2);\n});\n' },
   "R-019 (Python)": { rule: "R-019", path: "pysvc/test_canary_r019.py", content: "def test_order():\n    pass\n" },
+  // One asserting test must not hide a sibling that asserts nothing.
+  "R-019 (per test)": {
+    rule: "R-019",
+    path: "src/canary-r019-per-test.test.ts",
+    content: 'import { expect, test } from "vitest";\nimport { total } from "./orders";\n\ntest("sums", () => {\n  expect(total([1, 2])).toBe(3);\n});\n\ntest("sums again", () => {\n  const sum = total([2, 2]);\n});\n',
+  },
+  // A decoder under another name is still not validation.
+  "R-015 (alias)": {
+    rule: "R-015",
+    path: "app/api/aliased/route.ts",
+    content: "const decode = JSON;\n\nexport async function POST(request: Request): Promise<Response> {\n  const body = decode.parse(await request.text());\n  return Response.json(body);\n}\n",
+  },
   "R-021": {
     path: "lockcanary/package.json",
     content: JSON.stringify({ name: "lock-canary", dependencies: { ms: "2.1.3", "left-pad-imaginary-pkg": "1.0.0" } }),

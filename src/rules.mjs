@@ -115,10 +115,45 @@ const PY_VALIDATES = /^\s*(?:from|import)\s+(?:pydantic|marshmallow|wtforms|flas
 const PY_VALIDATE_CALL = /([\w.]*)\s*\.\s*(?:validate|load)\s*\(/g;
 const PY_DECODERS = new Set(["json", "pickle", "yaml", "toml", "tomllib", "tomli", "marshal", "csv", "orjson", "ujson", "simplejson", "msgpack", "plistlib", "shelve", "np", "numpy", "torch", "joblib", "dotenv", "load_dotenv"]);
 
+// Package names whose default or namespace import is a decoder, beyond the ones spelled like DECODERS.
+const DECODER_MODULES = new Map([["js-yaml", "yaml"], ["papaparse", "papa"], ["@iarna/toml", "toml"], ["smol-toml", "toml"], ["node:querystring", "querystring"], ["node:url", "url"], ["node:path", "path"]]);
+
+/**
+ * Names that hold a decoder under another name: `const p = JSON`,
+ * `import * as y from "yaml"`, `const q = require("qs")`, `import json as j`,
+ * `j = json`. Followed in order, so an alias of an alias counts too.
+ */
+function decoderAliases(content, decoders, python) {
+  const aliases = new Set();
+  const isDecoder = (name) => decoders.has(name.toLowerCase()) || aliases.has(name.toLowerCase());
+  const moduleDecoder = (spec) => {
+    const s = spec.toLowerCase();
+    const name = DECODER_MODULES.get(s) ?? s.replace(/^node:/, "");
+    return decoders.has(name);
+  };
+  const patterns = python
+    ? [
+        [/^[ \t]*import[ \t]+([\w.]+)[ \t]+as[ \t]+(\w+)/gm, (m) => decoders.has(m[1].split(".").pop().toLowerCase()), 2],
+        [/^[ \t]*(\w+)[ \t]*=[ \t]*([\w.]+)[ \t]*(?:#.*)?$/gm, (m) => isDecoder(m[2].split(".").pop()), 1],
+      ]
+    : [
+        [/\b(?:const|let|var)\s+([\w$]+)\s*=\s*([\w$.]+)\s*(?:;|$)/gm, (m) => isDecoder(m[2].split(".").pop()), 1],
+        [/\bimport\s+(?:\*\s+as\s+)?([\w$]+)\s+from\s+["']([^"']+)["']/g, (m) => moduleDecoder(m[2]), 1],
+        [/\b(?:const|let|var)\s+([\w$]+)\s*=\s*require\(\s*["']([^"']+)["']\s*\)/g, (m) => moduleDecoder(m[2]), 1],
+      ];
+  // Matches in source order, so `a = JSON` then `b = a` resolves both.
+  const all = patterns.flatMap(([re, test, group]) => [...content.matchAll(re)].map((m) => ({ m, test, group })));
+  all.sort((a, b) => a.m.index - b.m.index);
+  for (const { m, test, group } of all) if (test(m)) aliases.add(m[group].toLowerCase());
+  return aliases;
+}
+
 /** True when some `.parse(`/`.validate(`-style call is made on something other than a plain decoder. */
-function callsValidator(content, re, decoders) {
+function callsValidator(content, re, decoders, python = false) {
+  const aliases = decoderAliases(content, decoders, python);
   for (const [, receiver] of content.matchAll(re)) {
-    if (!decoders.has(receiver.split(".").pop().toLowerCase())) return true;
+    const name = receiver.split(".").pop().toLowerCase();
+    if (!decoders.has(name) && !aliases.has(name)) return true;
   }
   return false;
 }
@@ -163,7 +198,7 @@ export const FILE_RULES = [
     check(file, content) {
       if (PY_EXT.test(file)) {
         const isRoute = PY_ROUTE.test(content) || (/(?:^|\/)views\.py$/.test(file) && /\bdef\s+\w+\(\s*(?:self\s*,\s*)?request\b/.test(content));
-        if (!isRoute || !PY_READS_INPUT.test(content) || PY_VALIDATES.test(content) || callsValidator(content, PY_VALIDATE_CALL, PY_DECODERS)) return [];
+        if (!isRoute || !PY_READS_INPUT.test(content) || PY_VALIDATES.test(content) || callsValidator(content, PY_VALIDATE_CALL, PY_DECODERS, true)) return [];
         return [{ line: lineOf(content, content.search(PY_READS_INPUT)), text: "reads input; no pydantic/marshmallow/forms/serializer validation found" }];
       }
       const isRoute = ROUTE_FILE.test(file) || SERVER_ROUTE_CALL.test(content);

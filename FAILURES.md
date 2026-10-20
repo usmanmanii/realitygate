@@ -173,6 +173,10 @@ checked that a plain decoder didn't. Both use the same method name.
 count; a schema object, a chained `z.object(…).parse(…)` or marshmallow's `schema.load(…)` still
 does. Both R-015 canaries now plant a decoder-only route, and tests cover both directions.
 
+*Follow-up:* a decoder under another name (`const p = JSON; p.parse(body)`, `import * as y from
+"yaml"`, `const q = require("qs")`, `import json as j`) also counted as validation. Aliases are now
+followed in source order, including an alias of an alias. Canary: `R-015 (alias)`.
+
 ### F-020 — "Add tests" was satisfied by tests that could never fail
 **What happened:** asked to add tests, agents write `test("works", () => {})`,
 `expect(true).toBe(true)`, a file of `render(<App />)` calls with no assertion, or a
@@ -208,6 +212,36 @@ parent lockfile now counts only at a real workspace root. What remained were thr
 positives: stale lockfiles missing packages that `package.json` declared, which `npm ci` would
 also refuse. The README and the guide now say what an entry proves (the package exists) and what
 it doesn't (that it's safe).
+
+### F-022 — One real assertion hid the tests next to it that checked nothing
+**What happened:** R-019 judged "no assertion" per file. A file with one asserting test and a
+sibling like `test("adds again", () => { const r = add(2, 2); })` passed, because the sibling's
+body wasn't literally `{}`. Separately, R-019 read Python and Go test functions with a shared
+global regex whose position carried over from one file to the next, so after a file with no
+assertion, the first tests of the next file could be skipped.
+**Why nothing caught it:** the tests checked one file at a time, so the carried-over position
+never showed up, and a per-test check had been left out as too likely to misfire.
+**Now:** each test's body is read on its own, and a test with no assertion in a file whose other
+tests assert is a warning. Anything that can fail the test counts: helpers named like assertions,
+functions defined in the file, imports from test-support modules, `throw`, `await`, the test's own
+parameters (`t`, `done`, fixtures), and anything in `cypress/`, `e2e/` or `playwright/`, where page
+objects assert out of sight. Over 3,500 test files in local repositories (outside `venv` and
+`node_modules`), the first version wrongly flagged a Cypress page-object suite, a test whose
+`async()` had no space (the inner callback was read as the body), `SortTester.testSort(…)`
+helpers and a `def test1` nested inside a test. All four are fixed and have tests. One warning
+remained, and it was a real catch: an LRU cache test that calls `get` and checks nothing. The
+regex position is reset after every use, with a test that runs files in a row. Canary:
+`R-019 (per test)`.
+
+### F-023 — Deleting the manifest made change mode quieter, not louder
+**What happened:** `check --changed` rechecks R-014 when a manifest changes, but a deleted
+`package.json` or `.env.example` didn't count as changed: only added, modified and renamed files
+were listed. The rules it fed simply turned off, and the gate went green.
+**Why nothing caught it:** a missing manifest has always meant "nothing to check against" in a
+full scan, which is reasonable for a project that never had one, but not for a change that removes it.
+**Now:** change mode also lists files deleted or renamed away since the base. A deleted manifest or
+env example is a warning on that path, saying how many source files it covered and which rule no
+longer checks them, and the R-014/R-017 recheck of unchanged files still runs.
 
 ---
 

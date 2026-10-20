@@ -1,5 +1,6 @@
 import { loadConfig } from "./config.mjs";
-import { ENV_EXAMPLE_FILE } from "./env.mjs";
+import { posix } from "node:path";
+import { ENV_EXAMPLE_FILE, documentedEnv } from "./env.mjs";
 import { MANIFEST } from "./lockfile.mjs";
 import { listFiles } from "./files.mjs";
 import { compileGlobs } from "./glob.mjs";
@@ -12,7 +13,7 @@ import { c, out } from "./ui.mjs";
  * target that matched zero files (unless listed in mayBeEmpty with a reason):
  * a scan of nothing is a broken gate, not a clean one.
  */
-export function runCheck(root, { configPath, onlyFiles } = {}) {
+export function runCheck(root, { configPath, onlyFiles, deleted } = {}) {
   const config = loadConfig(root, configPath);
   const allFiles = listFiles(root);
   const selected = selectSources(root, config, allFiles);
@@ -44,7 +45,19 @@ export function runCheck(root, { configPath, onlyFiles } = {}) {
   // rules on every unchanged file.
   const widened = [];
   if (onlyFiles) {
-    const changed = [...onlyFiles];
+    // A deleted manifest or env example doesn't break a check, it switches one off. Say so.
+    const gone = [...(deleted ?? [])].filter((f) => MANIFEST.test(f) || ENV_EXAMPLE_FILE.test(f));
+    const env = gone.some((f) => ENV_EXAMPLE_FILE.test(f)) ? documentedEnv(root, allFiles) : null;
+    for (const f of gone) {
+      const dir = posix.dirname(f) === "." ? "" : `${posix.dirname(f)}/`;
+      const under = selected.files.filter((s) => s.startsWith(dir));
+      const text = ENV_EXAMPLE_FILE.test(f)
+        ? `deleted in this change: ${under.filter((s) => !env.forFile(s)).length} source file(s) under ${dir || "the root"} now have no env example, so R-017 no longer checks the vars they read`
+        : `deleted in this change: imports in ${under.length} source file(s) under ${dir || "the root"} are checked only if another manifest still covers them (R-014), and its dependencies are no longer checked against a lockfile (R-021)`;
+      const rule = ENV_EXAMPLE_FILE.test(f) ? "R-017" : "R-014";
+      findings.push({ rule, label: "check switched off: its source file was deleted", severity: "warn", custom: false, file: f, line: 1, text });
+    }
+    const changed = [...onlyFiles, ...gone];
     const rules = new Set();
     const because = changed.filter((f) => {
       const manifest = MANIFEST.test(f);

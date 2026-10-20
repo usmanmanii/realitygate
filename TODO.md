@@ -13,30 +13,35 @@ what's wrong, how we know, and the fix we have in mind. P1 items can mislead a u
 - [x] **Empty or always-true tests make the Tests category look healthy.** Fixed: R-019 (empty
   bodies, literal assertions, files with no assertion, committed `.only`) and R-020 (warning,
   unconditional skips); the audit reports test files with assertions. See FAILURES F-020.
-  Remaining limits: "no assertion" is judged per file, not per test, so one asserting test hides
-  empty siblings that aren't literally `{}`; a `describe` with no tests is left to the runner
-  (Jest fails it); a custom assert helper (`ok(...)`) isn't recognised, but files with no
-  recognised test calls aren't judged either.
+  Each test is now also judged on its own (warning, F-022), and a shared-regex bug that skipped
+  tests in the next file is fixed. Remaining limits: a helper imported from an ordinary module with
+  a plain name (`runCase(x)`) can't be followed, so such a test gets the warning (add
+  `justified:`); a `describe` with no tests is left to the runner (Jest fails it); tests whose
+  callback is a named function (`test("x", runCase)`) or an expression body aren't judged per test.
 - [x] **R-015 counts `JSON.parse(...)` as validation.** Fixed: the receiver of `.parse`/
   `.validate`/`.load` decides; decoders (`JSON`, `qs`, `yaml`, `json`, `pickle`…) don't count.
-  See FAILURES F-019. Remaining limit: a decoder held in a renamed variable
-  (`const p = JSON; p.parse(x)`) still counts.
+  See FAILURES F-019. Renamed decoders (`const p = JSON`, `import * as y from "yaml"`,
+  `import json as j`) are followed too. Remaining limit: a decoder reached through an object
+  property or a function parameter (`const d = { p: JSON }; d.p.parse(x)`) still counts.
 - [x] **Exclusions aren't shown in `check` or `audit` output.** Fixed: a "Not scanned" list in
   `check` and `audit` (terminal, Markdown, JSON) with each glob, reason and file count, the
   built-in skips, generated files, test files and disabled rules (`disable` takes reasons now).
-  Remaining limit: R-018's skip list is summarised, not counted per file.
+  R-018's skips are counted per file too (entry files, files named by config, or "R-018 off" for
+  a `"./*"` export). Remaining limit: convention export names are listed, not counted.
 - [x] **`justified:` can be overused without anyone seeing it.** Fixed: the audit lists every
   justified line and its reason; `check` and the PR comment show the count (the PR comment also
   shows the change against the base).
 - [x] **Change mode misses findings caused by manifest changes.** Fixed: a changed manifest
   rechecks R-014, and a changed env example rechecks R-017, in every unchanged file, with a note
-  in the output. Remaining limit: a *deleted* manifest or env example turns those rules off
-  rather than flagging anything, as in a full scan.
+  in the output. A deleted (or renamed-away) manifest or env example is now a warning saying
+  which check it switched off (F-023), and the "Not scanned" list says when R-014 is off because a
+  language has no manifest at all.
 - [x] **R-014 passes an invented package once it's declared.** Fixed: R-021 (lockfile entry
   required; "can't verify" warning without a lockfile), and the guide and README say what an
   entry does and doesn't prove. See FAILURES F-021. Remaining limits: a hand-edited lockfile
-  fools it; `requirements.txt` alone (no lock) can only warn; `bun.lockb` is binary and unread;
-  Go `go.work` workspaces aren't followed.
+  fools it; `requirements.txt` alone (no lock) can only warn; `bun.lockb` is binary and unread (the
+  warning says to run `bun install --save-text-lockfile`; text `bun.lock` is read); Go
+  `go.work` workspaces aren't followed (tracked under P2).
 
 ## P2: coverage gaps
 
