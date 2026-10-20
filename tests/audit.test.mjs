@@ -15,13 +15,13 @@ const project = (files) => {
 
 const HEALTHY = {
   "package.json": { name: "healthy", scripts: { test: "vitest run" }, dependencies: { zod: "3.23.8" }, devDependencies: { vitest: "2.1.0" } },
-  "package-lock.json": "{}",
+  "package-lock.json": { lockfileVersion: 3, packages: { "": { name: "healthy" }, "node_modules/zod": { version: "3.23.8" }, "node_modules/vitest": { version: "2.1.0", dev: true } } },
   "tsconfig.json": { compilerOptions: { strict: true } },
   ".github/workflows/ci.yml": "on: push\n",
   "app/api/orders/route.ts": 'import { z } from "zod";\nconst Body = z.object({ sku: z.string() });\nexport async function POST(req: Request): Promise<Response> {\n  return Response.json(Body.parse(await req.json()));\n}\n',
   "src/orders.ts": 'export function total(items: number[]): number {\n  return items.reduce((a, b) => a + b, 0);\n}\n',
-  "tests/orders.test.ts": 'import { test } from "vitest";\ntest("user B cannot read user A order: 403", () => {});\n',
-  "tests/route.test.ts": 'import { test } from "vitest";\ntest("rejects invalid body", () => {});\n',
+  "tests/orders.test.ts": 'import { expect, test } from "vitest";\nimport { getOrder } from "./client";\ntest("user B cannot read user A order: 403", async () => {\n  expect((await getOrder("a", "user-b")).status).toBe(403);\n});\n',
+  "tests/route.test.ts": 'import { expect, test } from "vitest";\nimport { POST } from "../app/api/orders/route";\ntest("rejects invalid body", async () => {\n  await expect(POST(new Request("http://x", { method: "POST", body: "{}" }))).rejects.toThrow();\n});\n',
 };
 
 describe("audit", () => {

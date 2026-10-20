@@ -8,10 +8,13 @@ import { FAKE_AWS_KEY, FAKE_STRIPE_KEY, makeProject } from "./helpers.mjs";
 const cleanups = [];
 after(() => cleanups.forEach((c) => c()));
 
+// R-018 (unwired code) judges a whole project: these one-file fixtures export
+// names nothing imports by construction, so it is off here and tested on
+// complete projects in unwired.test.mjs.
 function scan(files, config = {}) {
   const p = makeProject(files);
   cleanups.push(p.cleanup);
-  const cfg = { ...structuredClone(DEFAULT_CONFIG), ...config };
+  const cfg = { ...structuredClone(DEFAULT_CONFIG), disable: ["R-018"], ...config };
   const allFiles = listFiles(p.dir);
   const { files: sources } = selectSources(p.dir, cfg, allFiles);
   return scanFiles(p.dir, sources, cfg, { allFiles });
@@ -78,6 +81,23 @@ describe("file rules", () => {
     });
     assert.deepEqual(rulesIn(f), []);
   });
+  test("R-015: decoding with JSON.parse, qs.parse or URL parsers is not validation", () => {
+    for (const decode of ["JSON.parse(await req.text())", "qs.parse(await req.text())", "JSON5.parse(await req.text())", "Object.fromEntries(new URLSearchParams(await req.text()))"]) {
+      const f = scan({ "app/api/orders/route.ts": `export async function POST(req: Request) {\n  const body = ${decode};\n  return Response.json(body);\n}\n` });
+      assert.ok(rulesIn(f).includes("R-015"), decode);
+    }
+  });
+  test("R-015: a schema's .parse or .validate still counts, including chained and decoded-then-validated input", () => {
+    for (const body of [
+      "Order.parse(JSON.parse(await req.text()))",
+      "z.object({ id: z.string() }).parse(await req.json())",
+      "await orderSchema.validate(await req.json())",
+      "schemas.order.safeParse(await req.json())",
+    ]) {
+      const f = scan({ "app/api/orders/route.ts": `export async function POST(req: Request) {\n  const body = ${body};\n  return Response.json(body);\n}\n` });
+      assert.ok(!rulesIn(f).includes("R-015"), body);
+    }
+  });
   test("R-015 treats a verified webhook signature as validation", () => {
     const f = scan({
       "app/api/webhooks/stripe/route.ts":
@@ -137,6 +157,6 @@ describe("custom rules from config", () => {
     assert.deepEqual(f.map((x) => `${x.rule}:${x.file}`), ["HC-1:src/ledger/repo.ts"]);
   });
   test("disable turns a rule off", () => {
-    assert.deepEqual(rulesIn(scan({ "src/a.ts": 'export function f(): void {\n  console.log("x");\n}\n' }, { disable: ["R-009"] })), []);
+    assert.deepEqual(rulesIn(scan({ "src/a.ts": 'export function f(): void {\n  console.log("x");\n}\n' }, { disable: ["R-009", "R-018"] })), []);
   });
 });
