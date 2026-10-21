@@ -141,6 +141,25 @@ describe("file rules", () => {
     });
     assert.equal(f.filter((x) => x.rule === "R-016").length, 1);
   });
+  test("R-022 catches null-only service methods even behind a feature flag", () => {
+    const f = scan({
+      "src/modules/billing/service.ts": "export async function charge(): Promise<Receipt | null> {\n  return null;\n}\n",
+      "src/payment.service.ts": "export class PaymentService {\n  async charge(): Promise<Receipt | null> {\n    return null;\n  }\n}\n",
+      "src/services/receipt.ts": "export const issueReceipt = async (id: string) => {\n  return null;\n};\n",
+      "src/services/preview.ts": "export const preview = (id: string) => null;\n",
+      "src/features.ts": "export const billingEnabled = false;\n",
+    });
+    assert.equal(f.filter((x) => x.rule === "R-022").length, 4);
+  });
+  test("R-022 leaves real nullable service flows and non-service files alone", () => {
+    const f = scan({
+      "src/modules/billing/service.ts": "export async function charge(id: string) {\n  if (!id) return null;\n  return saveCharge(id);\n}\n",
+      "src/services/order.ts": "export function find(id: string) {\n  return orders.get(id) ?? null;\n}\n",
+      "src/dashboard.ts": "export function emptyState() {\n  return null;\n}\n",
+      "src/services/help.ts": "export const example = `\nfunction fake() { return null; }\n`;\n// function commented() { return null; }\n",
+    });
+    assert.ok(!rulesIn(f).includes("R-022"));
+  });
 });
 
 describe("no false positives on legitimate code", () => {

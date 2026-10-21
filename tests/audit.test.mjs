@@ -54,6 +54,13 @@ describe("audit", () => {
     }
   });
 
+  test("null-only service lowers the fake-code score and gets a fix step", () => {
+    const r = runAudit(project({ ...HEALTHY, "src/billing/service.ts": "export function charge() {\n  return null;\n}\n" }));
+    assert.ok(r.findings.some((f) => f.rule === "R-022"));
+    assert.ok(r.categories.find((c) => c.id === "fake").score < 20);
+    assert.ok(r.fixPlan.some((step) => step.includes("src/billing/service.ts")));
+  });
+
   test("a committed .env is flagged by name without reading it", () => {
     const r = runAudit(project({ ...HEALTHY, ".env": "SECRET=do-not-read\n" }));
     assert.ok(r.signals.issues.some((s) => s.id === "ENV-COMMITTED"));

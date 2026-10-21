@@ -41,7 +41,7 @@ near-zero budget, with six ready-made subagents doing the planning, review and r
 | Commands | `audit [--exec] [--compare]` · `check [--changed]` · `boot` · `selftest` · `proof` · `review-pack` · `scan-skills` · `mcp` · `agents install` · `hooks install` · `init [--srs]` · `doctor` |
 | Build OS | Start from your SRS · 6 subagents · cost estimate with free-tier limits · release-readiness states · resumes from disk · change mode for existing repos |
 | Languages | JavaScript, TypeScript (incl. monorepos), Python, Go |
-| Rules | 18 built-in + your own, each proven by a planted canary |
+| Rules | 22 built-in + your own, each proven by a planted canary |
 | Privacy | Runs locally · no network · no telemetry · never reads `.env` contents |
 | Dependencies | 0 (Node ≥ 20 standard library) |
 | License | MIT © Muhammad Usman |
@@ -340,7 +340,7 @@ and pin a version or commit.
 
 ## 🔍 What it catches
 
-18 built-in rules, all tested, all proven by `selftest` on every run.
+22 built-in rules, all tested, all proven by `selftest` on every run.
 
 | Rule | Catches | Why it matters |
 |---|---|---|
@@ -365,6 +365,7 @@ and pin a version or commit.
 | R-019 | In test files only: a test with an empty body (`() => {}`, `pass`, `...`, docstring-only, empty `func TestX`), an assertion on a literal (`expect(true).toBe(true)`, `assert.equal(1, 1)`, `assert True`, `self.assertEqual(1, 1)`), a test file whose tests contain no assertion anywhere (unless the first test's line says `justified:`), a single test with no assertion in a file whose other tests have one *(warning; helpers named like assertions, functions defined in the file, test-support imports, `throw`, `await`, the test's own parameters and e2e folders count as a way to fail)*, or a committed `.only`/`fit`/`fdescribe`/`{ only: true }`. Fixtures, mocks and snapshots aren't read | "Add tests" satisfied by tests that can't fail; `.only` silently drops the rest of the suite |
 | R-020 | In test files only *(warning)*: an unconditional skip (`.skip`, `xit`/`xdescribe`, `{ skip: true }`, `@pytest.mark.skip`, `@unittest.skip`, a Go test that starts with `t.Skip`). Conditional skips (`skipIf`, `skipif`, `if testing.Short()`) and lines with `justified:` are fine | Failing tests skipped to turn the suite green |
 | R-021 | In dependency manifests (`package.json`, `requirements*.txt`, `pyproject.toml`, `Pipfile`, `setup.py`/`setup.cfg`, `go.mod`): a declared dependency with no entry in the lockfile (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `poetry.lock`, `uv.lock`, `pdm.lock`, `Pipfile.lock`, `go.sum`) next to it, or at a workspace root above it. Offline: only a registry install writes an entry. Skipped: workspace siblings, `workspace:`/`file:`/`link:` deps, Go modules replaced by a local path, pyproject `[build-system]`. No lockfile (or only binary `bun.lockb`) is a *warning*: "can't verify" | A package an agent invented *and* declared, which R-014 can't see. An entry proves the package exists, not that it's safe |
+| R-022 | JS/TS functions, class methods, or arrow functions in `service.*`, `*.service.*`, or `services/` whose entire body returns `null` | A service stub that can hide behind a feature flag and appear complete; conditional `null` returns with a real path are allowed |
 
 Plus project checks in `audit`: a committed `.env` (detected by name, **never read**), no tests,
 thin tests, **no negative-authorization tests** while routes exist, no real test script,

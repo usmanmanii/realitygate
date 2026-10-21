@@ -58,6 +58,7 @@ const CANARIES = {
     content: JSON.stringify({ name: "lock-canary", dependencies: { ms: "2.1.3", "left-pad-imaginary-pkg": "1.0.0" } }),
     extra: { "lockcanary/package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "lock-canary" }, "node_modules/ms": { version: "2.1.3" } } }) },
   },
+  "R-022": { path: "src/billing/service.ts", content: "export async function charge(): Promise<Receipt | null> {\n  return null;\n}\n" },
   "R-019 (Go)": { rule: "R-019", path: "gosvc/canary_r019_test.go", content: 'package gosvc\n\nimport "testing"\n\nfunc TestOrder(t *testing.T) {\n}\n' },
   "R-006 (Python)": { rule: "R-006", path: "pysvc/canary_r006.py", content: "TOTAL = 1  # type: ignore\n" },
   "R-013 (Go)": { rule: "R-013", path: "gosvc/canary_r013.go", content: 'package gosvc\n\nimport "os"\n\nfunc Load() {\n\t_, err := os.ReadFile("x")\n\tif err != nil {\n\t}\n}\n' },

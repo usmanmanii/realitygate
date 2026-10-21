@@ -243,6 +243,17 @@ full scan, which is reasonable for a project that never had one, but not for a c
 env example is a warning on that path, saying how many source files it covered and which rule no
 longer checks them, and the R-014/R-017 recheck of unchanged files still runs.
 
+### F-024 — A null-only service looked implemented behind a feature flag
+**Reported by:** Abdul Rafay, in a public discussion of RealityGate.
+**What happened:** a service method can exist and compile while its whole implementation is
+`return null`. A feature flag can keep the path out of normal testing and review.
+**Why nothing caught it:** R-002 looked for explicit stub wording; R-018 only warned when an export
+appeared unused, so a referenced null-only method could pass the gate.
+**Now:** R-022 fails JS/TS service functions, methods and arrows whose entire implementation
+returns `null`. It covers `service.*`, `*.service.*`, and files under `services/`. A conditional
+`null` result with a real implementation path is allowed. It does not infer whether a feature
+flag is enabled or prove a user journey is wired up; tests for that flow are still needed.
+
 ---
 
 ## Add yours

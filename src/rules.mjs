@@ -14,6 +14,7 @@ import { unwiredExports } from "./unwired.mjs";
 const CODE_EXT = /\.(?:[cm]?[jt]sx?|py|go)$/;
 const PY_EXT = /\.py$/;
 const JS_TS_PY_EXT = /\.(?:[cm]?[jt]sx?|py)$/;
+const SERVICE_FILE = /(?:^|\/)(?:services?\/|(?:service|[^/]+[.-]service)\.[cm]?[jt]sx?$)/;
 
 export const LINE_RULES = [
   {
@@ -158,6 +159,50 @@ function callsValidator(content, re, decoders, python = false) {
   return false;
 }
 
+/** A whole service implementation that only returns null is a likely stub. */
+function nullOnlyServiceMethods(file, content) {
+  if (!SERVICE_FILE.test(file)) return [];
+  const code = maskStringsAndComments(content);
+  const hits = [];
+  const block = /(^|\n)[ \t]*(?:export\s+)?(?:default\s+)?(?:(?:public|private|protected|static|override|async)\s+)*(?:function\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*(?::\s*[^{}\n]+)?\{\s*return\s+null\s*;?\s*\}/g;
+  const arrow = /(^|\n)[ \t]*(?:export\s+)?(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::\s*[^=\n]+)?=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::\s*[^{}=\n]+)?=>\s*(?:\{\s*return\s+null\s*;?\s*\}|null\b(?=\s*(?:;|\n|$)))/g;
+  for (const re of [block, arrow]) {
+    for (const match of code.matchAll(re)) {
+      if (re === block && /^(?:if|for|while|switch|catch|with)$/.test(match[2])) continue;
+      hits.push({ line: lineOf(content, match.index + match[1].length), text: `${match[2]} always returns null` });
+    }
+  }
+  return hits;
+}
+
+/** Preserve offsets and newlines while removing text that only looks like code. */
+function maskStringsAndComments(content) {
+  const out = [...content];
+  let mode = "code";
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    const next = content[i + 1];
+    if (mode === "code") {
+      if (ch === "/" && next === "/") { mode = "line"; out[i] = out[++i] = " "; }
+      else if (ch === "/" && next === "*") { mode = "block"; out[i] = out[++i] = " "; }
+      else if (ch === "'" || ch === '"' || ch === "`") { mode = ch; out[i] = " "; }
+    } else if (mode === "line") {
+      if (ch === "\n") mode = "code";
+      else out[i] = " ";
+    } else if (mode === "block") {
+      if (ch === "*" && next === "/") { out[i] = out[++i] = " "; mode = "code"; }
+      else if (ch !== "\n") out[i] = " ";
+    } else if (ch === "\\") {
+      out[i] = " ";
+      if (next !== undefined) { i++; if (next !== "\n") out[i] = " "; }
+    } else if (ch === mode) {
+      out[i] = " ";
+      mode = "code";
+    } else if (ch !== "\n") out[i] = " ";
+  }
+  return out.join("");
+}
+
 export const FILE_RULES = [
   {
     id: "R-013",
@@ -266,6 +311,12 @@ export const FILE_RULES = [
     check(file, content, ctx) {
       return ctx.locks.check(file, content);
     },
+  },
+  {
+    id: "R-022",
+    label: "service method whose entire implementation returns null",
+    exts: JS_TS_EXT,
+    check: nullOnlyServiceMethods,
   },
 ];
 

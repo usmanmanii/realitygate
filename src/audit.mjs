@@ -42,6 +42,7 @@ const RULE_COST = {
   "R-019": ["tests", 3],
   "R-020": ["tests", 1],
   "R-021": ["hallucination", 5],
+  "R-022": ["fake", 4],
 };
 const CUSTOM_COST = ["security", 3];
 
@@ -175,7 +176,7 @@ function fixPlan(categories, findings, signals) {
     plan.push("URGENT: rotate exposed credentials, move secrets to the host's env store, git-ignore `.env*`, and remove public-prefixed secret env vars.");
   }
   if (byRule["R-014"]) plan.push(`Resolve ${byRule["R-014"].length} undeclared import(s): add the real package or remove the invented one (${topFiles(byRule["R-014"])}).`);
-  const fake = ["R-001", "R-002", "R-003", "R-004", "R-005"].flatMap((r) => byRule[r] ?? []);
+  const fake = ["R-001", "R-002", "R-003", "R-004", "R-005", "R-022"].flatMap((r) => byRule[r] ?? []);
   if (fake.length) plan.push(`Replace ${fake.length} stub/placeholder/hardcoded-example occurrence(s) with real implementations (${topFiles(fake)}).`);
   if (byRule["R-015"]) plan.push(`Add schema validation (e.g. zod) to ${byRule["R-015"].length} route(s) that read input (${topFiles(byRule["R-015"])}).`);
   if (has("NO-NEGATIVE-AUTHZ")) plan.push("Write negative-authorization tests: user A must get 401/403 on user B's objects, for every route that touches data.");
