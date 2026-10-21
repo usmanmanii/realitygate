@@ -4,7 +4,7 @@
 
 ## 0.3.0 — 2026-10-21
 
-**Upgrading:** gates can go red on upgrade. New error rules: R-017 (env var missing from `.env.example`), R-019 (tests that can't fail, including a committed `.only`) and R-021 (declared dependency missing from the lockfile; a stale lockfile fails). R-015 now flags routes that only decode input. Fix the code, or add a `justified: <reason>` comment where the rule allows it; an `exclude` or `disable` entry needs a reason and is listed under Not scanned. New warnings (R-018, R-020, per-test R-019) don't fail the gate. Scores can drop.
+**Upgrading:** gates can go red on upgrade. New error rules: R-017 (env var missing from `.env.example`), R-019 (tests that can't fail, including a committed `.only`) R-021 (declared dependency missing from the lockfile; a stale lockfile fails) and R-022 (a service function or method whose whole body returns `null`). R-015 now flags routes that only decode input. Fix the code, or add a `justified: <reason>` comment where the rule allows it; an `exclude` or `disable` entry needs a reason and is listed under Not scanned. New warnings (R-018, R-020, per-test R-019) don't fail the gate. Scores can drop.
 
 ### Added
 - `init --srs <file>` copies your SRS or requirements document into `docs/input/` (never overwrites it, refuses `.env*` files), and `doctor` reports whether any requirements input exists yet.
@@ -15,6 +15,7 @@
 - R-017: env var the code reads (`process.env`, `import.meta.env`, `os.environ`, `os.getenv`, `os.Getenv`) that the nearest `.env.example` doesn't list. `audit` adds `ENV-NO-EXAMPLE` when code reads env vars and no example file covers it.
 - R-018 (warning): exported functions, components, classes and consts that no other file mentions, with framework entry points, config-named files and convention exports skipped.
 - R-019: tests that can't fail, read from test files only: empty bodies (JS/TS, Python, Go), assertions on a literal (`expect(true).toBe(true)`, `assert True`), test files with no assertion at all, and committed `.only`/`fit`. R-020 (warning): unconditional skips (`.skip`, `xit`, `@pytest.mark.skip`, `t.Skip` first). `check` prints how many test files it read; the audit charges both to the Tests category and reports how many test files contain an assertion. Gates can go red on upgrade if a suite has empty tests or a committed `.only`.
+- R-022: JS/TS functions, class methods and arrows in `service.*`, `*.service.*` or `services/` files whose entire implementation returns `null` (F-024). A feature flag elsewhere doesn't hide the stub; a conditional `null` with a real path is allowed. Gates can go red on upgrade where a service is still a null stub.
 - R-021: a declared dependency with no entry in the lockfile next to its manifest (or at a workspace root above it): npm, pnpm, yarn, bun, poetry, uv, pdm, Pipfile and go.sum. Offline, and closes R-014's gap where an agent invents a package and also declares it. No lockfile is a "can't verify" warning, not a pass. `check` prints how many manifests it read. The hallucinated-packages guide now says plainly that a lockfile entry proves a package exists, not that it's safe. Gates can go red on upgrade where a lockfile is stale.
 - `check` and `audit` (terminal, Markdown, JSON `excluded`) print a **Not scanned** list: each `exclude` glob with its reason and file count, the built-in skip list, generated files, files outside the include targets, test files, disabled rules and R-018's skips. `disable` now also accepts `{ "id", "reason" }`.
 - The audit lists every `justified:` comment with its reason (JSON `justified`), `check` prints the count, and the PR comment shows the count and its change against the base.
@@ -29,6 +30,7 @@
 
 ### Fixed
 - R-015 counted any `.parse(` or `.load(` call as validation, so `JSON.parse(await req.text())` or `json.load(request.files[...])` made an unvalidated route pass. Decoders such as `JSON`, `qs`, `yaml`, `pickle` and `json` no longer count; a schema's `.parse`/`.validate`/`.load` still does. Routes that only decoded input may now get R-015. A decoder under another name (`const p = JSON`, `import * as y from "yaml"`, `const q = require("qs")`, `import json as j`) doesn't count either.
+- `boot` on Windows could fail to remove its temporary copy (`EPERM`) because the killed app still held its files. It now waits up to 5 s for the app to exit, and a copy it still can't remove is a warning, not a boot failure.
 - R-019 could skip the first tests of a Python or Go test file read right after a file with no assertion, because a shared regex kept its position between files.
 - The portable `realitygate-build` skill (Codex, Antigravity and other Agent Skills tools) was missing the "fill in IDEA.md" and "execute Phase 0" steps: they were dropped together with the plugin-only fallback line. A test now guards every skill against this.
 

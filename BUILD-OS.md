@@ -559,7 +559,7 @@ If it can't be done for real: write a blocker, mark BLOCKED, move on. Never simu
 
 ### 6.2 The Reality Gate: `npx realitygate check`
 
-The reference implementation ships in the `realitygate` CLI (21 built-in rules, R-001…R-021;
+The reference implementation ships in the `realitygate` CLI (22 built-in rules, R-001…R-022;
 see the README). Project-specific rules go in `realitygate.config.json`. Each one needs a
 `canary` string that violates it, so `selftest` can prove the rule fires. If a stack isn't
 covered (e.g. a language the CLI doesn't scan), write `scripts/reality-check.mjs` to these

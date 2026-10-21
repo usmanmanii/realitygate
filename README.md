@@ -673,6 +673,7 @@ deduction is capped, so one noisy area can't hide the others.
 - [x] Unwired code (R-018, warning)
 - [x] Tests that can't fail (R-019) and skipped tests (R-020, warning); executed test runs report how many tests passed
 - [x] Declared dependencies missing from the lockfile (R-021)
+- [x] Service methods whose whole body returns `null` (R-022)
 - [x] PR comment with the score delta: `audit --compare`, Action `comment: true`
 - [x] Read-only MCP server: `realitygate mcp`
 - [x] Change mode (`check --changed`, Build OS `change` track); guides for Spec Kit / OpenSpec / Superpowers

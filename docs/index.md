@@ -20,7 +20,7 @@ The audit reports a score, file and line references, and a fix plan. To fail CI 
 
 ## What it checks
 
-RealityGate has 21 built-in rules for unfinished implementations, placeholder copy, fake data, undeclared or never-installed packages, leaked credentials, swallowed errors, unvalidated routes, undocumented env vars, unwired code, tests that can't fail, and other common AI coding failures, in JavaScript, TypeScript, Python and Go. Its report keeps the static score apart from the checks that actually ran. `selftest` plants violations to prove the rules can fail. `scan-skills` checks skills and plugins for known security red flags before installation.
+RealityGate has 22 built-in rules for unfinished implementations, null-only service stubs, placeholder copy, fake data, undeclared or never-installed packages, leaked credentials, swallowed errors, unvalidated routes, undocumented env vars, unwired code, tests that can't fail, and other common AI coding failures, in JavaScript, TypeScript, Python and Go. Its report keeps the static score apart from the checks that actually ran. `selftest` plants violations to prove the rules can fail. `scan-skills` checks skills and plugins for known security red flags before installation.
 
 It runs locally, has no runtime dependencies, sends no telemetry, and never reads `.env` file contents. Pattern checks are heuristic: a clean result does not prove that an app is correct or secure.
 
